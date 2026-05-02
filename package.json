@@ -1,0 +1,15 @@
+{
+  "name": "skibidi-basement",
+  "version": "1.0.0",
+  "description": "Granny-style stealth horror game — single-file browser playable. Built with Three.js.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
