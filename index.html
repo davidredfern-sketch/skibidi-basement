@@ -1889,10 +1889,22 @@ function playerCaught(e){
   setTimeout(() => showEnd(false, `Caught by the ${e.name}.`), 1100);
 }
 
+function safeUnlock(){
+  try {
+    if(document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+  } catch(e){ /* ignore — was never locked */ }
+}
+function safeLock(){
+  if(isTouch) return; // mobile doesn't pointer lock
+  try {
+    if(controls && controls.lock) controls.lock();
+  } catch(e){ /* ignore */ }
+}
+
 function showEnd(win, reason){
   gameOver = !win;
   gameWon = win;
-  controls.unlock();
+  safeUnlock();
   const es = document.getElementById('endscreen');
   es.classList.add('show');
   if(win){
@@ -1906,15 +1918,19 @@ function showEnd(win, reason){
   }
 }
 
-document.getElementById('endscreen').addEventListener('click', () => {
+function handleEndScreenClick(){
   document.getElementById('endscreen').classList.remove('show');
+  document.getElementById('endscreen').classList.remove('win');
+  document.getElementById('blood').classList.remove('show');
   if(gameWon){
     if(day < 5){ day++; }
-    else { day = 1; } // wrap to start
+    else { day = 1; }
   }
   resetLevel();
-  controls.lock();
-});
+  safeLock();
+}
+document.getElementById('endscreen').addEventListener('click', handleEndScreenClick);
+document.getElementById('endscreen').addEventListener('touchend', e => { e.preventDefault(); handleEndScreenClick(); }, {passive:false});
 
 function resetLevel(){
   player.alive = true; player.hidden = false; player.hidingIn = null;
