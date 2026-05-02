@@ -73,15 +73,15 @@
   #endscreen p { color:#ccc; font-size:18px; }
 
   /* ============ MINIMAP ============ */
-  #minimap { position:fixed; top:14px; right:50%; transform:translateX(50%); width:240px; height:200px;
-             background:rgba(0,0,0,0.7); border:2px solid rgba(255,209,102,0.5); border-radius:4px;
+  #minimap { position:fixed; top:14px; left:14px; width:220px; height:184px;
+             background:rgba(0,0,0,0.75); border:2px solid rgba(255,209,102,0.5); border-radius:4px;
              box-shadow: 0 0 14px rgba(0,0,0,0.7); z-index:5; pointer-events:none;
              image-rendering:pixelated; }
-  #minimapLabel { position:fixed; top:218px; right:50%; transform:translateX(50%); color:#ffd166;
+  #minimapLabel { position:fixed; top:200px; left:14px; color:#ffd166;
                   font-size:10px; letter-spacing:2px; z-index:5; pointer-events:none;
                   text-shadow:1px 1px 0 #000; }
   @media (max-width: 900px), (pointer: coarse) {
-    #minimap { width:140px; height:118px; top:8px; right:auto; left:50%; transform:translateX(-50%); }
+    #minimap { width:130px; height:108px; top:60px; left:8px; }
     #minimapLabel { display:none; }
   }
 
@@ -155,7 +155,7 @@
     <div class="val"><span id="distr">3</span></div>
   </div>
 </div>
-<canvas id="minimap" width="240" height="200"></canvas>
+<canvas id="minimap" width="220" height="184"></canvas>
 <div id="minimapLabel">MAP</div>
 <div id="crosshair"></div>
 <div id="prompt"></div>
@@ -879,19 +879,31 @@ controls.addEventListener('unlock', () => {
 });
 
 /* ========== ITEMS ========== */
+// Item spawn cells — verified open floor (not walls, not closets/doors, not on player spawn)
+// MAP key: '.' = open floor, '#' = wall, 'c' = closet (collider), 'd' = door, 'e' = exit
 const itemPool = [
-  { name:'BEDROOM KEY', cell:[10,3], color:0xffe066 },
-  { name:'BASEMENT KEY', cell:[12,1], color:0xc0392b },
-  { name:'FUSE', cell:[3,12], color:0x4cc9f0 },
-  { name:'DRAIN CLEANER', cell:[11,8], color:0x4caf50 },
-  { name:'PIPE WRENCH', cell:[13,12], color:0xf6ad55 },
+  { name:'BEDROOM KEY',   cell:[3, 1],  color:0xffe066 }, // bedroom interior
+  { name:'BASEMENT KEY',  cell:[10, 2], color:0xc0392b }, // kitchen
+  { name:'FUSE',          cell:[3, 13], color:0x4cc9f0 }, // living room
+  { name:'DRAIN CLEANER', cell:[12, 11],color:0x4caf50 }, // storage room
+  { name:'PIPE WRENCH',   cell:[12, 6], color:0xf6ad55 }, // hallway
 ];
+
+function isFreeCell(c, r){
+  if(r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+  return MAP[r][c] === '.';
+}
+
 const items = [];
 function spawnItems(){
   for(const it of items){ scene.remove(it.mesh); }
   items.length = 0;
-  // pick 3
-  const shuffled = itemPool.slice().sort(()=>Math.random()-0.5).slice(0,3);
+  // pick 3 — but only from cells confirmed as open floor
+  const valid = itemPool.filter(i => isFreeCell(i.cell[0], i.cell[1]));
+  if(valid.length < 3){
+    console.warn('Not enough valid item spawn cells — using fallbacks');
+  }
+  const shuffled = valid.slice().sort(()=>Math.random()-0.5).slice(0,3);
   for(const i of shuffled){
     const grp = new THREE.Group();
     const mesh = new THREE.Mesh(
