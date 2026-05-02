@@ -2,11 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
 <title>SKIBIDI BASEMENT</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Special+Elite&display=swap');
   * { box-sizing:border-box; }
-  body { margin:0; padding:0; background:#000; color:#ccc; font-family:'Special Elite',monospace; overflow:hidden; }
+  html, body { margin:0; padding:0; background:#000; color:#ccc; font-family:'Special Elite',monospace; overflow:hidden; height:100%; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; overscroll-behavior:none; }
   canvas { display:block; }
   #hud { position:fixed; top:0; left:0; width:100%; padding:14px 24px; pointer-events:none; z-index:5;
          display:flex; justify-content:space-between; align-items:flex-start; }
@@ -66,6 +71,59 @@
   #endscreen h2 { font-family:'Creepster',cursive; font-size:80px; color:#c0392b; margin:0; }
   #endscreen.win h2 { color:#4caf50; }
   #endscreen p { color:#ccc; font-size:18px; }
+
+  /* ============ MOBILE UI ============ */
+  #touchUI { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:8; display:none; }
+  #touchUI.show { display:block; }
+  /* Virtual joystick (left thumb area) */
+  #joyZone { position:absolute; left:0; bottom:0; width:50%; height:50%; pointer-events:auto; }
+  #joyBase { position:absolute; left:60px; bottom:60px; width:120px; height:120px; border-radius:50%;
+             background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.25); pointer-events:none;
+             box-shadow: 0 0 10px rgba(0,0,0,0.6); }
+  #joyKnob { position:absolute; left:60px; bottom:60px; width:60px; height:60px; border-radius:50%;
+             background:rgba(255,255,255,0.4); border:2px solid rgba(255,255,255,0.6); transform:translate(30px,-30px);
+             pointer-events:none; transition:transform 0.05s; }
+  #lookZone { position:absolute; right:0; top:0; width:50%; height:100%; pointer-events:auto; }
+  /* Action buttons */
+  .btn { position:absolute; pointer-events:auto; width:64px; height:64px; border-radius:50%;
+         background:rgba(192,57,43,0.35); border:2px solid rgba(255,255,255,0.4);
+         color:#fff; font-family:'Special Elite',monospace; font-size:14px; font-weight:bold;
+         display:flex; align-items:center; justify-content:center; text-align:center; line-height:1;
+         box-shadow: 0 0 12px rgba(0,0,0,0.6); user-select:none; -webkit-user-select:none; }
+  .btn:active, .btn.held { background:rgba(231,76,60,0.7); transform:scale(0.92); }
+  #btnSprint { right:24px; bottom:160px; background:rgba(255,200,100,0.35); }
+  #btnCrouch { right:100px; bottom:100px; background:rgba(70,140,200,0.35); }
+  #btnInteract { right:24px; bottom:80px; background:rgba(255,209,102,0.45); width:80px; height:80px; font-size:16px; }
+  #btnDistraction { right:120px; bottom:200px; background:rgba(120,80,180,0.4); }
+  #btnPause { left:14px; top:14px; width:40px; height:40px; font-size:18px; pointer-events:auto;
+              background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.3); border-radius:6px;
+              color:#fff; display:none; align-items:center; justify-content:center; position:absolute; z-index:9; }
+  #btnPause.show { display:flex; }
+  /* Mobile responsive HUD */
+  @media (max-width: 900px), (pointer: coarse) {
+    h1 { display:none; }
+    #hud { padding:8px 10px; font-size:11px; }
+    #hud .panel { padding:5px 8px; }
+    #hud .lbl { font-size:9px; letter-spacing:1px; }
+    #hud .val { font-size:14px; }
+    #stamina { width:100px; }
+    #title h1 { font-size:54px !important; letter-spacing:3px; }
+    #title p { font-size:14px; padding:0 12px; }
+    #title button { font-size:18px; padding:12px 24px; }
+    #title .ctrls { display:none; }
+    #title .mobileCtrls { display:block !important; color:#888; font-size:12px; margin-top:14px; padding:0 16px; text-align:center; }
+    #endscreen h2 { font-size:48px; }
+    #endscreen p { font-size:14px; padding:0 20px; text-align:center; }
+    #crosshair { width:4px; height:4px; }
+  }
+  /* Landscape orientation prompt */
+  #rotatePrompt { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; color:#fff;
+                  z-index:11; align-items:center; justify-content:center; flex-direction:column; padding:20px; text-align:center; font-family:'Special Elite',monospace;}
+  #rotatePrompt .icon { font-size:64px; margin-bottom:20px; animation:rotateAnim 2s ease-in-out infinite; }
+  @keyframes rotateAnim { 0%,100%{transform:rotate(0deg);} 50%{transform:rotate(90deg);} }
+  @media (max-width: 900px) and (orientation: portrait) {
+    #rotatePrompt { display:flex; }
+  }
 </style>
 </head>
 <body>
@@ -122,6 +180,29 @@
     &nbsp;·&nbsp; <kbd>Mouse</kbd> look &nbsp;·&nbsp; <kbd>E</kbd> interact &nbsp;·&nbsp; <kbd>F</kbd> distraction
     &nbsp;·&nbsp; <kbd>Esc</kbd> release mouse
   </div>
+  <div class="mobileCtrls" style="display:none;">
+    Left thumb: <b>move</b>. Right side drag: <b>look</b>. Tap buttons for sprint/crouch/interact/distraction.
+  </div>
+</div>
+
+<!-- Mobile touch UI (auto-shown on touch devices) -->
+<div id="touchUI">
+  <div id="joyZone"></div>
+  <div id="lookZone"></div>
+  <div id="joyBase"></div>
+  <div id="joyKnob"></div>
+  <button class="btn" id="btnSprint">SPRINT</button>
+  <button class="btn" id="btnCrouch">CROUCH</button>
+  <button class="btn" id="btnInteract">USE</button>
+  <button class="btn" id="btnDistraction">THROW</button>
+</div>
+<button id="btnPause">≡</button>
+
+<!-- Landscape rotate prompt for portrait mobile -->
+<div id="rotatePrompt">
+  <div class="icon">📱</div>
+  <div style="font-size:20px; color:#c0392b; margin-bottom:8px;">ROTATE YOUR DEVICE</div>
+  <div style="font-size:14px; color:#888;">SKIBIDI BASEMENT plays best in landscape mode</div>
 </div>
 
 <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
@@ -188,10 +269,11 @@ scene.background = new THREE.Color(0x080812);
 scene.fog = new THREE.Fog(0x080812, 4, 22);
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.05, 80);
-const renderer = new THREE.WebGLRenderer({ antialias: false });
-renderer.setPixelRatio(window.devicePixelRatio);
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+const _isTouchEarly = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+renderer.setPixelRatio(_isTouchEarly ? Math.min(1.5, window.devicePixelRatio) : window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !_isTouchEarly; // disable shadows on mobile for fps
 renderer.shadowMap.type = THREE.BasicShadowMap;
 document.body.appendChild(renderer.domElement);
 
@@ -535,7 +617,7 @@ scene.add(camera);
 
 // DUST particles in flashlight beam
 const dustParticles = [];
-const dustMaxCount = 40;
+const dustMaxCount = _isTouchEarly ? 12 : 40;
 const dustGeom = new THREE.SphereGeometry(0.012, 4, 4);
 const dustMat = new THREE.MeshBasicMaterial({ color: 0xffeec0, transparent:true, opacity:0.6 });
 for(let i=0;i<dustMaxCount;i++){
@@ -613,10 +695,164 @@ const keys = {};
 addEventListener('keydown', e => { keys[e.code] = true; });
 addEventListener('keyup', e => { keys[e.code] = false; });
 
+/* ========== MOBILE / TOUCH SUPPORT ========== */
+const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+if(isTouch){
+  document.getElementById('touchUI').classList.add('show');
+  document.getElementById('btnPause').classList.add('show');
+  document.querySelector('.mobileCtrls').style.display = 'block';
+}
+
+// Touch state
+const tState = {
+  moveId: null, moveStart: null,
+  lookId: null, lookLast: null,
+  joyDX: 0, joyDY: 0,
+};
+
+function startTouchListeners(){
+  const joyZone = document.getElementById('joyZone');
+  const lookZone = document.getElementById('lookZone');
+  const knob = document.getElementById('joyKnob');
+  const base = document.getElementById('joyBase');
+  const JOY_RADIUS = 50;
+
+  joyZone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if(tState.moveId !== null) return;
+    const t = e.changedTouches[0];
+    tState.moveId = t.identifier;
+    tState.moveStart = { x:t.clientX, y:t.clientY };
+    base.style.left = (t.clientX - 60) + 'px';
+    base.style.bottom = (window.innerHeight - t.clientY - 60) + 'px';
+    knob.style.left = (t.clientX - 30) + 'px';
+    knob.style.bottom = (window.innerHeight - t.clientY - 30) + 'px';
+    knob.style.transform = 'translate(0,0)';
+  }, {passive:false});
+
+  joyZone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier === tState.moveId){
+        let dx = t.clientX - tState.moveStart.x;
+        let dy = t.clientY - tState.moveStart.y;
+        const dist = Math.hypot(dx, dy);
+        if(dist > JOY_RADIUS){
+          dx = dx/dist * JOY_RADIUS;
+          dy = dy/dist * JOY_RADIUS;
+        }
+        tState.joyDX = dx / JOY_RADIUS;
+        tState.joyDY = dy / JOY_RADIUS;
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        // map to keys
+        const dead = 0.25;
+        keys['KeyW'] = tState.joyDY < -dead;
+        keys['KeyS'] = tState.joyDY > dead;
+        keys['KeyA'] = tState.joyDX < -dead;
+        keys['KeyD'] = tState.joyDX > dead;
+      }
+    }
+  }, {passive:false});
+
+  function endMove(e){
+    e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier === tState.moveId){
+        tState.moveId = null;
+        tState.joyDX = 0; tState.joyDY = 0;
+        knob.style.transform = 'translate(0,0)';
+        knob.style.left = '60px';
+        knob.style.bottom = '60px';
+        base.style.left = '60px';
+        base.style.bottom = '60px';
+        keys['KeyW'] = keys['KeyS'] = keys['KeyA'] = keys['KeyD'] = false;
+      }
+    }
+  }
+  joyZone.addEventListener('touchend', endMove, {passive:false});
+  joyZone.addEventListener('touchcancel', endMove, {passive:false});
+
+  // Look zone — drag to rotate camera
+  const _lookEuler = new THREE.Euler(0,0,0,'YXZ');
+  lookZone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if(tState.lookId !== null) return;
+    const t = e.changedTouches[0];
+    tState.lookId = t.identifier;
+    tState.lookLast = { x:t.clientX, y:t.clientY };
+  }, {passive:false});
+  lookZone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier === tState.lookId){
+        const dx = t.clientX - tState.lookLast.x;
+        const dy = t.clientY - tState.lookLast.y;
+        tState.lookLast = { x:t.clientX, y:t.clientY };
+        _lookEuler.setFromQuaternion(camera.quaternion);
+        _lookEuler.y -= dx * 0.005;
+        _lookEuler.x -= dy * 0.005;
+        _lookEuler.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, _lookEuler.x));
+        camera.quaternion.setFromEuler(_lookEuler);
+      }
+    }
+  }, {passive:false});
+  function endLook(e){
+    for(const t of e.changedTouches){
+      if(t.identifier === tState.lookId){
+        tState.lookId = null;
+      }
+    }
+  }
+  lookZone.addEventListener('touchend', endLook, {passive:false});
+  lookZone.addEventListener('touchcancel', endLook, {passive:false});
+
+  // Action buttons — map to keys
+  function bindBtn(id, code, latching=false){
+    const el = document.getElementById(id);
+    let pressed = false;
+    el.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if(latching){
+        pressed = !pressed;
+        keys[code] = pressed;
+        el.classList.toggle('held', pressed);
+      } else {
+        keys[code] = true;
+        el.classList.add('held');
+      }
+    }, {passive:false});
+    function release(e){
+      e.preventDefault();
+      if(!latching){
+        keys[code] = false;
+        el.classList.remove('held');
+      }
+    }
+    el.addEventListener('touchend', release, {passive:false});
+    el.addEventListener('touchcancel', release, {passive:false});
+  }
+  bindBtn('btnSprint', 'ShiftLeft', false);
+  bindBtn('btnCrouch', 'ControlLeft', true);   // toggle so you can crouch-walk
+  bindBtn('btnInteract', 'KeyE', false);
+  bindBtn('btnDistraction', 'KeyF', false);
+
+  // Pause button — releases pointer (no effect on mobile but useful for menu)
+  document.getElementById('btnPause').addEventListener('touchstart', e => {
+    e.preventDefault();
+    document.getElementById('title').style.display = 'flex';
+  }, {passive:false});
+}
+if(isTouch) startTouchListeners();
+
 document.getElementById('start').addEventListener('click', () => {
   document.getElementById('title').style.display = 'none';
-  controls.lock();
+  if(!isTouch) controls.lock();
   startAmbient(); // user gesture unlocks audio context
+  // try to fullscreen on mobile
+  if(isTouch && document.documentElement.requestFullscreen){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
   setMsg('You wake up. Find 3 items. Reach the EXIT door.');
 });
 
