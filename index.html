@@ -459,9 +459,9 @@ const doorTex = makeTex((g, w, h) => {
 const CELL = 4;
 const MAP = [
   '###############',
-  '#.....#.....#e#', // bedroom + kitchen (right) + exit
+  '#.....#......e#', // bedroom + kitchen (right) + exit (col 13) reachable via col 12
   '#.....#.....###',
-  '#.c...d.....d.#',
+  '#.c...d.......#',
   '#.....#.......#',
   '###d###########', // separator with bedroom door
   '#.............#', // hallway
@@ -551,18 +551,37 @@ function buildHouse(){
     h.collider = cBox;
   }
 
-  // exit door
+  // exit door — big, glowing, unmistakable
+  // Player approaches from the south (positive z direction toward exit cell at exitPos.z=4)
+  // Wall to the north of exit is at row 0 (z=0). Player path is via col 12 row 1 → col 13 row 1.
   if(exitPos){
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(1.8, 2.5, 0.2),
-      new THREE.MeshStandardMaterial({ map: doorTex, emissive: 0xff2200, emissiveIntensity:0.4 })
-    );
-    door.position.set(exitPos.x, 1.25, exitPos.z);
+    const doorMat = new THREE.MeshStandardMaterial({
+      map: doorTex, emissive: 0xff3300, emissiveIntensity:0.9, roughness:0.6
+    });
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.6, 0.25), doorMat);
+    // Place door in centre of exit cell, facing south (toward kitchen approach)
+    door.position.set(exitPos.x, 1.3, exitPos.z);
     scene.add(door);
-    // glowing aura light
-    const exitLight = new THREE.PointLight(0xff3300, 1.5, 10, 2);
-    exitLight.position.set(exitPos.x, 2.0, exitPos.z);
+    // EXIT sign above door
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.45, 0.06),
+      new THREE.MeshStandardMaterial({ color:0x220000, emissive:0xff0000, emissiveIntensity:2 })
+    );
+    sign.position.set(exitPos.x, 2.75, exitPos.z + 0.15); // slightly south so visible
+    scene.add(sign);
+    // glowing red aura — light positioned south of door so it lights the approach
+    const exitLight = new THREE.PointLight(0xff3300, 3, 16, 2);
+    exitLight.position.set(exitPos.x, 2.0, exitPos.z + 1.5);
     scene.add(exitLight);
+    window._exitLight = exitLight;
+    // floor glow strip leading FROM door TOWARD kitchen (positive z direction)
+    const strip = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.6, 6),
+      new THREE.MeshBasicMaterial({ color:0xff2200, transparent:true, opacity:0.45 })
+    );
+    strip.rotation.x = -Math.PI/2;
+    strip.position.set(exitPos.x, 0.02, exitPos.z + 3.5);
+    scene.add(strip);
   }
 
   // Some props for atmosphere — beds, sofas (just boxes)
