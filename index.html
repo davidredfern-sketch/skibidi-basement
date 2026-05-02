@@ -72,6 +72,19 @@
   #endscreen.win h2 { color:#4caf50; }
   #endscreen p { color:#ccc; font-size:18px; }
 
+  /* ============ MINIMAP ============ */
+  #minimap { position:fixed; top:14px; right:50%; transform:translateX(50%); width:240px; height:200px;
+             background:rgba(0,0,0,0.7); border:2px solid rgba(255,209,102,0.5); border-radius:4px;
+             box-shadow: 0 0 14px rgba(0,0,0,0.7); z-index:5; pointer-events:none;
+             image-rendering:pixelated; }
+  #minimapLabel { position:fixed; top:218px; right:50%; transform:translateX(50%); color:#ffd166;
+                  font-size:10px; letter-spacing:2px; z-index:5; pointer-events:none;
+                  text-shadow:1px 1px 0 #000; }
+  @media (max-width: 900px), (pointer: coarse) {
+    #minimap { width:140px; height:118px; top:8px; right:auto; left:50%; transform:translateX(-50%); }
+    #minimapLabel { display:none; }
+  }
+
   /* ============ MOBILE UI ============ */
   #touchUI { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:8; display:none; }
   #touchUI.show { display:block; }
@@ -142,6 +155,8 @@
     <div class="val"><span id="distr">3</span></div>
   </div>
 </div>
+<canvas id="minimap" width="240" height="200"></canvas>
+<div id="minimapLabel">MAP</div>
 <div id="crosshair"></div>
 <div id="prompt"></div>
 <div id="msg"></div>
@@ -1937,6 +1952,135 @@ function updateAtmosphere(dt){
   }
 }
 
+/* ========== MINIMAP ========== */
+const mmCanvas = document.getElementById('minimap');
+const mmCtx = mmCanvas.getContext('2d');
+const MM_W = mmCanvas.width, MM_H = mmCanvas.height;
+const WORLD_W = COLS * CELL, WORLD_H = ROWS * CELL;
+function worldToMap(wx, wz){
+  return [ (wx / WORLD_W) * MM_W, (wz / WORLD_H) * MM_H ];
+}
+function drawMinimap(){
+  mmCtx.fillStyle = '#0a0508';
+  mmCtx.fillRect(0, 0, MM_W, MM_H);
+  // floor cells (lit) — draw a uniform floor first
+  mmCtx.fillStyle = '#241510';
+  mmCtx.fillRect(0, 0, MM_W, MM_H);
+  // walls (darker)
+  const cellW = MM_W / COLS, cellH = MM_H / ROWS;
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const ch = MAP[r][c];
+      if(ch === '#'){
+        mmCtx.fillStyle = '#000';
+        mmCtx.fillRect(c*cellW, r*cellH, cellW+0.5, cellH+0.5);
+      } else if(ch === 'd'){
+        mmCtx.fillStyle = '#4a3020';
+        mmCtx.fillRect(c*cellW, r*cellH, cellW, cellH);
+      } else if(ch === 'c'){
+        mmCtx.fillStyle = '#5a3a1a';
+        mmCtx.fillRect(c*cellW + cellW*0.2, r*cellH + cellH*0.2, cellW*0.6, cellH*0.6);
+      } else if(ch === 'e'){
+        // pulsing exit
+        const pulse = 0.6 + Math.sin(performance.now()/250)*0.4;
+        mmCtx.fillStyle = `rgba(255,${Math.floor(50*pulse)},${Math.floor(20*pulse)},${pulse})`;
+        mmCtx.fillRect(c*cellW, r*cellH, cellW, cellH);
+        mmCtx.strokeStyle = '#ffaa00';
+        mmCtx.lineWidth = 1.5;
+        mmCtx.strokeRect(c*cellW, r*cellH, cellW, cellH);
+      }
+    }
+  }
+  // grid lines (subtle)
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.3)';
+  mmCtx.lineWidth = 0.5;
+  for(let c=1;c<COLS;c++){
+    mmCtx.beginPath(); mmCtx.moveTo(c*cellW, 0); mmCtx.lineTo(c*cellW, MM_H); mmCtx.stroke();
+  }
+  for(let r=1;r<ROWS;r++){
+    mmCtx.beginPath(); mmCtx.moveTo(0, r*cellH); mmCtx.lineTo(MM_W, r*cellH); mmCtx.stroke();
+  }
+
+  // ITEMS — bright pulsing dots
+  for(const it of items){
+    if(it.picked) continue;
+    const [mx, my] = worldToMap(it.mesh.position.x, it.mesh.position.z);
+    const pulse = 0.6 + Math.sin(performance.now()/200)*0.4;
+    // glow halo
+    const grad = mmCtx.createRadialGradient(mx, my, 0, mx, my, 14);
+    grad.addColorStop(0, `rgba(255,220,80,${pulse*0.7})`);
+    grad.addColorStop(1, 'rgba(255,220,80,0)');
+    mmCtx.fillStyle = grad;
+    mmCtx.beginPath(); mmCtx.arc(mx, my, 14, 0, Math.PI*2); mmCtx.fill();
+    // core
+    mmCtx.fillStyle = '#ffe066';
+    mmCtx.beginPath(); mmCtx.arc(mx, my, 4, 0, Math.PI*2); mmCtx.fill();
+    mmCtx.strokeStyle = '#000'; mmCtx.lineWidth = 1; mmCtx.stroke();
+  }
+
+  // ENEMIES — red dots with vision cones
+  for(const e of enemies){
+    const [mx, my] = worldToMap(e.pos.x, e.pos.z);
+    // vision cone
+    const visPx = (e.visionRange / WORLD_W) * MM_W;
+    const coneColor = e.state === 'chase' ? 'rgba(255,30,30,0.35)' :
+                      e.state === 'investigate' ? 'rgba(255,180,30,0.25)' :
+                      'rgba(255,255,255,0.12)';
+    mmCtx.fillStyle = coneColor;
+    mmCtx.beginPath();
+    mmCtx.moveTo(mx, my);
+    // facing on map: world facing maps directly since map has same axes
+    const facingOnMap = Math.atan2(Math.cos(e.facing), Math.sin(e.facing)); // approx: world x→map x, world z→map y
+    // simpler: visionRange points are at e.facing on world (atan2(dx, dz)) — translate similarly
+    const startAng = Math.atan2(Math.sin(e.facing), Math.cos(e.facing)) - Math.PI/2; // adjust for canvas Y
+    const a1 = startAng - e.visionAngle/2;
+    const a2 = startAng + e.visionAngle/2;
+    mmCtx.arc(mx, my, visPx, a1, a2);
+    mmCtx.closePath();
+    mmCtx.fill();
+    // body
+    mmCtx.fillStyle = e.state === 'chase' ? '#ff2020' : '#cc4040';
+    mmCtx.beginPath(); mmCtx.arc(mx, my, 5, 0, Math.PI*2); mmCtx.fill();
+    mmCtx.strokeStyle = '#000'; mmCtx.lineWidth = 1; mmCtx.stroke();
+    // pulsing red ring when chasing
+    if(e.state === 'chase'){
+      const r = 6 + Math.sin(performance.now()/100)*3;
+      mmCtx.strokeStyle = '#ff2020';
+      mmCtx.lineWidth = 1.5;
+      mmCtx.beginPath(); mmCtx.arc(mx, my, r, 0, Math.PI*2); mmCtx.stroke();
+    }
+  }
+
+  // PLAYER — green triangle showing direction
+  const [pmx, pmy] = worldToMap(camera.position.x, camera.position.z);
+  // vision cone
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  const lookAng = Math.atan2(fwd.x, fwd.z); // world space
+  // map: x stays x, z stays y (canvas y axis matches z forward)
+  const mapAng = -Math.PI/2 + Math.atan2(fwd.z, fwd.x);
+  // simpler: angle on map = atan2(fwd.z, fwd.x) since canvas x = world x and canvas y = world z
+  const ma = Math.atan2(fwd.z, fwd.x);
+  // flashlight cone on map
+  const coneR = 30;
+  mmCtx.fillStyle = 'rgba(255,240,160,0.18)';
+  mmCtx.beginPath();
+  mmCtx.moveTo(pmx, pmy);
+  mmCtx.arc(pmx, pmy, coneR, ma - Math.PI/6, ma + Math.PI/6);
+  mmCtx.closePath();
+  mmCtx.fill();
+  // body
+  mmCtx.save();
+  mmCtx.translate(pmx, pmy);
+  mmCtx.rotate(ma);
+  mmCtx.fillStyle = player.hidden ? '#3498db' : '#06ffa5';
+  mmCtx.beginPath();
+  mmCtx.moveTo(7, 0); mmCtx.lineTo(-4, 4); mmCtx.lineTo(-4, -4); mmCtx.closePath();
+  mmCtx.fill();
+  mmCtx.strokeStyle = '#000'; mmCtx.lineWidth = 1; mmCtx.stroke();
+  mmCtx.restore();
+}
+
 /* ========== GAME LOOP ========== */
 function animate(){
   const dt = Math.min(0.05, clock.getDelta());
@@ -1970,6 +2114,7 @@ function animate(){
   updateHUD();
 
   renderer.render(scene, camera);
+  drawMinimap();
   requestAnimationFrame(animate);
 }
 animate();
